@@ -6,25 +6,26 @@ const progressBar = document.getElementById('progress-bar');
 const percentText = document.getElementById('percent');
 const loadingMessage = document.getElementById('loading-message').querySelector('span');
 const playersText = document.getElementById('players');
+const pingText = document.getElementById('ping');
 const audio = document.getElementById('bg-audio');
 const audioToggle = document.getElementById('audio-toggle');
 
-/* ---------- LOADING MESSAGES ---------- */
+/* ---------- CROATIAN LOADING MESSAGES ---------- */
 const messages = [
-    'CONNECTING TO MONACO REDZONE..',
-    'LOADING SERVER RESOURCES..',
-    'INITIALIZING ESX FRAMEWORK..',
-    'LOADING CHARACTER DATA..',
-    'SYNCING WORLD ENTITIES..',
-    'PREPARING ECONOMY SYSTEM..',
-    'LOADING CUSTOM VEHICLES..',
-    'LOADING CUSTOM CLOTHING..',
-    'SYNCING POLICE DEPARTMENT..',
-    'SYNCING EMS DEPARTMENT..',
-    'LOADING MLO INTERIORS..',
-    'SECURING ANTI-CHEAT..',
-    'FINALIZING CONNECTION..',
-    'WELCOME TO MONACO REDZONE'
+    'POVEZIVANJE S MONACO REDZONE..',
+    'UČITAVANJE RESURSA SERVERA..',
+    'INICIJALIZACIJA ESX FRAMEWORK-A..',
+    'UČITAVANJE PODATAKA LIKA..',
+    'SINKRONIZACIJA SVIJETA..',
+    'PRIPREMA EKONOMSKOG SUSTAVA..',
+    'UČITAVANJE CUSTOM VOZILA..',
+    'UČITAVANJE CUSTOM ODJEĆE..',
+    'SINKRONIZACIJA POLICIJE..',
+    'SINKRONIZACIJA HITNE POMOĆI..',
+    'UČITAVANJE INTERIJERA (MLO)..',
+    'POKRETANJE ANTI-CHEAT SUSTAVA..',
+    'ZAVRŠAVANJE POVEZIVANJA..',
+    'DOBRODOŠLI U MONACO REDZONE'
 ];
 
 let currentMessage = 0;
@@ -52,7 +53,7 @@ function updateProgress(value) {
     }
 }
 
-/* ---------- FAKE PROGRESS (when not in FiveM) ---------- */
+/* ---------- FAKE PROGRESS (browser preview) ---------- */
 function fakeProgress() {
     if (usingFiveM) return;
     if (realProgress < 100) {
@@ -94,6 +95,61 @@ window.addEventListener('message', (event) => {
     }
 });
 
+/* ---------- REAL PING MEASUREMENT ---------- */
+const PING_ENDPOINTS = [
+    'https://1.1.1.1/cdn-cgi/trace',
+    'https://www.cloudflare.com/cdn-cgi/trace',
+    'https://www.gstatic.com/generate_204'
+];
+const pingHistory = [];
+const PING_HISTORY_SIZE = 5;
+let pingEndpointIndex = 0;
+
+async function measurePing() {
+    const url = PING_ENDPOINTS[pingEndpointIndex] + '?_=' + Date.now();
+    const start = performance.now();
+    try {
+        await fetch(url, {
+            method: 'GET',
+            mode: 'no-cors',
+            cache: 'no-store',
+            credentials: 'omit'
+        });
+        return Math.round(performance.now() - start);
+    } catch {
+        pingEndpointIndex = (pingEndpointIndex + 1) % PING_ENDPOINTS.length;
+        return null;
+    }
+}
+
+function colorForPing(ms) {
+    if (ms < 40) return '#00ff88';
+    if (ms < 80) return '#a8ff00';
+    if (ms < 130) return '#ffd000';
+    if (ms < 200) return '#ff8800';
+    return '#ff3344';
+}
+
+async function pingLoop() {
+    const ms = await measurePing();
+    if (ms !== null) {
+        pingHistory.push(ms);
+        if (pingHistory.length > PING_HISTORY_SIZE) pingHistory.shift();
+
+        const avg = Math.round(
+            pingHistory.reduce((a, b) => a + b, 0) / pingHistory.length
+        );
+        pingText.textContent = avg + ' ms';
+        pingText.style.color = colorForPing(avg);
+        pingText.style.textShadow = '0 0 12px ' + colorForPing(avg);
+    } else {
+        pingText.textContent = '-- ms';
+        pingText.style.color = '#6b6b6b';
+        pingText.style.textShadow = 'none';
+    }
+    setTimeout(pingLoop, 2500);
+}
+
 /* ---------- AUDIO ---------- */
 let audioMuted = false;
 audio.volume = 0.35;
@@ -102,7 +158,6 @@ function tryPlayAudio() {
     const playPromise = audio.play();
     if (playPromise !== undefined) {
         playPromise.catch(() => {
-            // autoplay blocked - wait for user interaction
             document.addEventListener('click', () => audio.play().catch(() => {}), { once: true });
             document.addEventListener('keydown', () => audio.play().catch(() => {}), { once: true });
         });
@@ -154,5 +209,6 @@ window.addEventListener('load', () => {
     createParticles();
     tryPlayAudio();
     animatePlayers();
+    pingLoop();
     setTimeout(fakeProgress, 600);
 });
