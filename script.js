@@ -235,6 +235,17 @@ async function playersLoop() {
     setTimeout(playersLoop, PLAYER_REFRESH_MS);
 }
 
+/* ---------- VIDEO DIAGNOSTIC ---------- */
+const bgVideo = document.getElementById('bg-video');
+if (bgVideo) {
+    bgVideo.addEventListener('error', () => {
+        console.warn('[Monaco RedZone] video.mp4 failed to load - make sure the file exists next to index.html');
+    });
+    bgVideo.addEventListener('loadeddata', () => {
+        bgVideo.play().catch(() => {});
+    });
+}
+
 /* ---------- INIT ---------- */
 window.addEventListener('load', () => {
     createParticles();
