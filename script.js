@@ -191,24 +191,55 @@ function createParticles() {
     }
 }
 
-/* ---------- PLAYER COUNT ANIMATION ---------- */
-function animatePlayers() {
-    const targets = [
-        '128/256', '129/256', '131/256', '132/256', '134/256',
-        '135/256', '133/256', '136/256', '138/256', '140/256'
-    ];
-    let i = 0;
-    setInterval(() => {
-        i = (i + 1) % targets.length;
-        playersText.textContent = targets[i];
-    }, 3500);
+/* ---------- REAL PLAYER COUNT ---------- */
+const SERVER_HOST = '185.195.237.206';
+const SERVER_PORT = 20012;
+const PLAYER_REFRESH_MS = 10000;
+let lastKnownPlayers = null;
+let lastKnownMax = 256;
+
+async function fetchServerPlayers() {
+    const url = `http://${SERVER_HOST}:${SERVER_PORT}/dynamic.json?_=${Date.now()}`;
+    try {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const current = typeof data.clients === 'number' ? data.clients : parseInt(data.clients);
+        const max = parseInt(data.sv_maxclients) || lastKnownMax;
+        if (isNaN(current)) return null;
+        return { current, max };
+    } catch {
+        return null;
+    }
+}
+
+function renderPlayers(current, max, live) {
+    playersText.textContent = `${current}/${max}`;
+    playersText.style.color = live ? '#ffffff' : '#b8b8b8';
+    playersText.style.textShadow = live ? '0 0 12px rgba(255, 0, 51, 0.5)' : 'none';
+}
+
+async function playersLoop() {
+    const data = await fetchServerPlayers();
+    if (data) {
+        lastKnownPlayers = data.current;
+        lastKnownMax = data.max;
+        renderPlayers(data.current, data.max, true);
+    } else if (lastKnownPlayers !== null) {
+        renderPlayers(lastKnownPlayers, lastKnownMax, false);
+    } else {
+        playersText.textContent = `--/${lastKnownMax}`;
+        playersText.style.color = '#6b6b6b';
+        playersText.style.textShadow = 'none';
+    }
+    setTimeout(playersLoop, PLAYER_REFRESH_MS);
 }
 
 /* ---------- INIT ---------- */
 window.addEventListener('load', () => {
     createParticles();
     tryPlayAudio();
-    animatePlayers();
+    playersLoop();
     pingLoop();
     setTimeout(fakeProgress, 600);
 });
